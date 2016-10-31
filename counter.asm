@@ -10,6 +10,8 @@
     units
     tens
     hundreds
+    ; temp variable is used with assembly-style if statements to store the 
+    ; subtraction result
     temp
     endc
     
@@ -40,13 +42,16 @@ MainLoop:
     
     ; Read input based on the button pressed
     banksel PORTB
-    ; If increment button is pressed then increment counter, else check next button
+    ; If increment button is pressed then increment counter, else check 
+    ; next button
     BTFSC PORTB,0
     GOTO Increment
-    ; If decrement button is pressed then decrement counter, else check next button
+    ; If decrement button is pressed then decrement counter, else check 
+    ; next button
     BTFSC PORTB,1
     GOTO Decrement
-    ; If reset button is pressed then reset the counter, else call main loop again
+    ; If reset button is pressed then reset the counter, else call 
+    ; main loop again
     BTFSC PORTB,2
     GOTO ResetCounter
     ; If no input is detected, continue looping
@@ -107,13 +112,14 @@ Increment:
     GOTO Increment
     ; Increment units
     INCF units,F
-    ; Check if units = D'10'
+    ; Checks if units = D'10'
     MOVLW B'00000000'
     ADDWF units,W
     ADDLW -B'00001010'
     MOVWF temp
     MOVF temp,F
-    ; If units = D'10' then increment tens variable, else return to main loop
+    ; If units = D'10' then increment tens variable, else return 
+    ; to main loop
     BTFSC STATUS,Z
     CALL IncrementTens
     GOTO MainLoop
@@ -125,7 +131,7 @@ IncrementTens:
     CALL ResetUnits
     ; Increment tens variable
     INCF tens,F
-    ; Check if tens = D'10'
+    ; Checks if tens = D'10'
     MOVLW B'00000000'
     ADDWF tens,W
     ADDLW -B'00001010'
@@ -145,59 +151,84 @@ IncrementHundreds:
     INCF hundreds,F
     RETURN
     
+    ; Function to decrement counter
 Decrement:
+    ; Wait until decrement button is released
     BTFSC PORTB,1
     GOTO Decrement
+    ; Decrement units variable
     DECF units,F
+    ; Checks if units = D'255' (representing -1 in this case)
     MOVLW B'00000000'
     ADDWF units,W
     ADDLW B'00000001'
     MOVWF temp
     MOVF temp,F
+    ; If units = D'255' then decrement tens variable. Otherwise go to 
+    ; main loop
     BTFSC STATUS,Z
     CALL DecrementTens
     GOTO MainLoop
     
+    ; Function to decrement tens variable/counter
 DecrementTens:
+    ; Move number 9 to units variable
     MOVLW B'00001001'
     MOVWF units
+    ; Decrement tens variable
     DECF tens,F
+    ; Checks if tens = D'255' (representing -1 in this case)
     MOVLW B'00000000'
     ADDWF tens,W
     ADDLW B'00000001'
     MOVWF temp
     MOVF temp,F
+    ; If tens = D'255' then decrement hundreds variable. Otherwise go to 
+    ; main loop
     BTFSC STATUS,Z
     CALL DecrementHundreds
     RETURN
     
+    ; Function to decrement hundreds variable/counter
 DecrementHundreds:
+    ; Move number 9 to tens variable
     MOVLW B'00001001'
     MOVWF tens
+    ; Decrement hundreds variable and return
     DECF hundreds,F
     RETURN
     
+    ; Auxiliar function to reset the counter displays and variables
 ResetCounter:
+    ; Wait until Reset button is released
     BTFSC PORTB,2
     GOTO ResetCounter
+    ; Call to functions to reset every display and variables
     CALL ResetUnits
     CALL ResetTens
     CALL ResetHundreds
     GOTO MainLoop
     
+    ; Reset units function
 ResetUnits:
+    ; Moves D'0' to units variable
     MOVLW B'00000000'
     MOVWF units
     RETURN
 
+    ; Reset tens function
 ResetTens:
+    ; Moves D'0' to tens variable
     MOVLW B'00000000'
     MOVWF tens
     RETURN
     
+    ; Reset hundreds function
 ResetHundreds:
+    ; Moves D'0' to hundreds variable
     MOVLW B'00000000'
     MOVWF hundreds
     RETURN
     
+    ; Program end
     end
