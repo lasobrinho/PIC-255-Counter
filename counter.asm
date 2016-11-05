@@ -34,9 +34,9 @@ SETUP:
     ; Moving initial value 0 to counter variables
     MOVLW B'00000000'
     MOVWF units
-    MOVLW B'00001001'
+    MOVLW B'00000000'
     MOVWF tens
-    MOVLW B'00001001'
+    MOVLW B'00000000'
     MOVWF hundreds
     ; Moving value 0 to range variable
     MOVLW B'00000000'
