@@ -1,4 +1,4 @@
-    LIST    P=16F877A,F=INHX8M
+
 #include <p16f877a.inc>
     
     __CONFIG _FOSC_HS & _WDTE_OFF & _PWRTE_ON & _BOREN_ON & _LVP_OFF & _CPD_OFF & _WRT_OFF & _CP_OFF
@@ -17,23 +17,30 @@
     ; Variables used in context saving for interruptions
     W_SAVE
     STATUS_SAVE
+    ; Auxiliar variable for CheckRange function
+    range
     endc
     
+    ; SETUP call
     org 0x00
     GOTO SETUP
     
+    ; 0x04 address for interruption management
     org 0x04
     GOTO INT_SERV
-       
     
+    ; Initial program setup
 SETUP:
     ; Moving initial value 0 to counter variables
     MOVLW B'00000000'
     MOVWF units
-    MOVLW B'00000000'
+    MOVLW B'00001001'
     MOVWF tens
-    MOVLW B'00000000'
+    MOVLW B'00001001'
     MOVWF hundreds
+    ; Moving value 0 to range variable
+    MOVLW B'00000000'
+    MOVWF range
     ; Configuring PORTB I/O
     banksel TRISB
     MOVLW B'11100000'
@@ -72,7 +79,6 @@ DisplayUnits:
     MOVF units,W
     MOVWF PORTC 
     ; Setting PORTB bit 7 as high to power on the display
-    ;banksel PORTB
     BSF PORTC,7    
     RETURN
     
@@ -89,7 +95,6 @@ DisplayTens:
     MOVF tens,W
     MOVWF PORTC
     ; Setting PORTB bit 6 as high to power on the display
-    ;banksel PORTB
     BSF PORTC,6
     RETURN
 
@@ -106,13 +111,14 @@ DisplayHundreds:
     MOVF hundreds,W
     MOVWF PORTC
     ; Setting PORTB bit 5 as high to power on the display
-    ;banksel PORTB
     BSF PORTC,5
     RETURN
     
     
     ; Function to increment the counter value
 Increment:
+    ; Check if display has number 999 to prevent it going to 1000
+    CALL CheckOverflow    
     ; Increment units
     INCF units,F
     ; Checks if units = D'10'
@@ -167,10 +173,11 @@ Decrement:
     ADDLW B'00000001'
     MOVWF temp
     MOVF temp,F
-    ; If units = D'255' then decrement tens variable. Otherwise go to 
-    ; main loop
+    ; If units = D'255' then decrement tens variable
     BTFSC STATUS,Z
     CALL DecrementTens
+    ; Check if the user isn't trying to decrement from 000
+    CALL CheckUnderflow
     RETURN
     
     
@@ -203,6 +210,64 @@ DecrementHundreds:
     DECF hundreds,F
     RETURN 
     
+    
+    ; Function to check if display has value 999 and prevent incrementing
+CheckOverflow:
+    MOVLW B'00000000'
+    MOVWF range
+    ; Checks if units = D'9'
+    MOVLW B'00000000'
+    ADDWF units,W
+    ADDLW -B'00001001'
+    MOVWF temp
+    MOVF temp,F
+    ; If units = D'9' then set range's bit 0 to 1
+    BTFSC STATUS,Z
+    BSF range,0
+    ; Checks if tens = D'9'
+    MOVLW B'00000000'
+    ADDWF tens,W
+    ADDLW -B'00001001'
+    MOVWF temp
+    MOVF temp,F
+    ; If tens = D'9' then set range's bit 1 to 1
+    BTFSC STATUS,Z
+    BSF range,1
+    ; Checks if hundreds = D'9'
+    MOVLW B'00000000'
+    ADDWF hundreds,W
+    ADDLW -B'00001001'
+    MOVWF temp
+    MOVF temp,F
+    ; If hundreds = D'9' then set range's bit 2 to 1
+    BTFSC STATUS,Z
+    BSF range,2
+    ; Checks if range = B'00000111'
+    MOVLW B'00000000'
+    ADDWF range,W
+    ADDLW -B'00000111'
+    MOVWF temp
+    MOVF temp,F
+    MOVLW B'00000000'
+    ; If range = B'00000111' then just decrement 1 from units
+    BTFSC STATUS,Z
+    DECF units,F
+    RETURN
+    
+    
+    ; Function to check if user decremented from 000, and increment units 
+    ; if that's the case
+CheckUnderflow:
+    ; Checks if hundreds = D'255'
+    MOVLW B'00000000'
+    ADDWF hundreds,W
+    ADDLW -B'11111111'
+    MOVWF temp
+    MOVF temp,F
+    ; If hundreds = D'255' then just call increment to return to 000
+    BTFSC STATUS,Z
+    CALL Increment
+    RETURN
     
     ; Auxiliar function to reset the counter displays and variables
 ResetCounter:
@@ -265,7 +330,8 @@ INT_SERV:
     ; main loop again
     BTFSC PORTB_temp,7
     CALL ResetCounter
-  
+    
+    ; Restore context after interruption instructions
     SWAPF STATUS_SAVE, W
     MOVWF STATUS
     SWAPF W_SAVE, F
