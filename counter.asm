@@ -3,11 +3,6 @@
     
     __CONFIG _FOSC_HS & _WDTE_OFF & _PWRTE_ON & _BOREN_ON & _LVP_OFF & _CPD_OFF & _WRT_OFF & _CP_OFF
     
-    CONSTANT BASE_VAR=0CH
-    
-W_SAVE         EQU BASE_VAR+3
-STATUS_SAVE    EQU BASE_VAR+4
-    
     ; Declaring program variables
     cblock 0x20
     units
@@ -16,26 +11,32 @@ STATUS_SAVE    EQU BASE_VAR+4
     ; temp variable is used with assembly-style if statements to store the 
     ; subtraction result
     temp
+    ; Variable to store current PORTB values in order to properly 
+    ; clear RBIE interruption
+    PORTB_temp
+    ; Variables used in context saving for interruptions
+    W_SAVE
+    STATUS_SAVE
     endc
     
-    org 000H
-    GOTO MAIN
+    org 0x00
+    GOTO SETUP
     
-    org 004H
+    org 0x04
     GOTO INT_SERV
        
     
-MAIN:
+SETUP:
     ; Moving initial value 0 to counter variables
-    MOVLW B'00001000'
+    MOVLW B'00000000'
     MOVWF units
-    MOVLW B'00001001'
+    MOVLW B'00000000'
     MOVWF tens
     MOVLW B'00000000'
     MOVWF hundreds
     ; Configuring PORTB I/O
     banksel TRISB
-    MOVLW B'00000111'
+    MOVLW B'11100000'
     MOVWF TRISB
     ; Configuring PORTC I/O
     banksel TRISC
@@ -55,22 +56,7 @@ MainLoop:
     CALL DisplayUnits
     CALL DisplayTens
     CALL DisplayHundreds
-    
-    ; Read input based on the button pressed
-    ;banksel PORTB
-    ; If increment button is pressed then increment counter, else check 
-    ; next button
-    ;BTFSC PORTB,0
-    ;GOTO Increment
-    ; If decrement button is pressed then decrement counter, else check 
-    ; next button
-    ;BTFSC PORTB,1
-    ;GOTO Decrement
-    ; If reset button is pressed then reset the counter, else call 
-    ; main loop again
-    ;BTFSC PORTB,2
-    ;GOTO ResetCounter
-    ; If no input is detected, continue looping
+    ; Continue looping if no interruptions happen
     GOTO MainLoop
 
     
@@ -127,9 +113,6 @@ DisplayHundreds:
     
     ; Function to increment the counter value
 Increment:
-    ; Wait until increment button is released
-    BTFSC PORTB,0
-    GOTO Increment
     ; Increment units
     INCF units,F
     ; Checks if units = D'10'
@@ -142,7 +125,7 @@ Increment:
     ; to main loop
     BTFSC STATUS,Z
     CALL IncrementTens
-    GOTO MainLoop
+    RETURN
     
     
     ; Function to increment tens variable/counter
@@ -176,9 +159,6 @@ IncrementHundreds:
     
     ; Function to decrement counter
 Decrement:
-    ; Wait until decrement button is released
-    BTFSC PORTB,1
-    GOTO Decrement
     ; Decrement units variable
     DECF units,F
     ; Checks if units = D'255' (representing -1 in this case)
@@ -191,7 +171,7 @@ Decrement:
     ; main loop
     BTFSC STATUS,Z
     CALL DecrementTens
-    GOTO MainLoop
+    RETURN
     
     
     ; Function to decrement tens variable/counter
@@ -221,19 +201,16 @@ DecrementHundreds:
     MOVWF tens
     ; Decrement hundreds variable and return
     DECF hundreds,F
-    RETURN
+    RETURN 
     
     
     ; Auxiliar function to reset the counter displays and variables
 ResetCounter:
-    ; Wait until Reset button is released
-    BTFSC PORTB,2
-    GOTO ResetCounter
     ; Call to functions to reset every display and variables
     CALL ResetUnits
     CALL ResetTens
     CALL ResetHundreds
-    GOTO MainLoop
+    RETURN
     
     
     ; Reset units function
@@ -261,31 +238,40 @@ ResetHundreds:
     
     
 INT_SERV:
-    
-    MOVWF W_SAVE        ; save W
-    SWAPF STATUS, W     ; save STATUS 
+    ; Save context before executing the interruption instructions
+    MOVWF W_SAVE
+    SWAPF STATUS, W
     MOVWF STATUS_SAVE
+    
+    ; Read PORTB in order to clear the mismatch condition stated 
+    ; in the datasheet
+    banksel PORTB
+    MOVF PORTB, W
+    ; Copy PORTB to PORTB_temp in order to read bits from PORTB value
+    MOVWF PORTB_temp
+    ; Clear RBIF flag
+    banksel INTCON
+    BCF INTCON,RBIF
      
     ; If increment button is pressed then increment counter, else check 
     ; next button
-    BTFSC PORTB,5
-    GOTO Increment
+    BTFSC PORTB_temp,5
+    CALL Increment
     ; If decrement button is pressed then decrement counter, else check 
     ; next button
-    BTFSC PORTB,6
-    GOTO Decrement
+    BTFSC PORTB_temp,6
+    CALL Decrement
     ; If reset button is pressed then reset the counter, else call 
     ; main loop again
-    BTFSC PORTB,7
-    GOTO ResetCounter
-    ; Clear RBIF flag
-    BCF INTCON,RBIF
-    
+    BTFSC PORTB_temp,7
+    CALL ResetCounter
+  
     SWAPF STATUS_SAVE, W
-    MOVWF STATUS	; restore W and STATUS
+    MOVWF STATUS
     SWAPF W_SAVE, F
-    SWAPF W_SAVE, W   
+    SWAPF W_SAVE, W
     
+    ; Execute RETFIE to activate GIE again for a new interruption
     RETFIE
     
     
