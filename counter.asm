@@ -37,6 +37,40 @@
     org 0x04
     GOTO INT_SERV
     
+    ; Interrupt function
+INT_SERV:
+    ; Save context before executing the interrupt instructions
+    MOVWF W_SAVE
+    SWAPF STATUS, W
+    MOVWF STATUS_SAVE
+    ; Read PORTB in order to clear the mismatch condition stated in the datasheet
+    banksel PORTB
+    MOVF PORTB, W
+    ; Copy PORTB to PORTB_temp in order to read bits from PORTB value
+    MOVWF PORTB_temp
+    ; Clear RBIF flag
+    banksel INTCON
+    BCF INTCON,RBIF
+     
+    ; If increment button is pressed then increment counter, else check next button
+    BTFSC PORTB_temp,5
+    CALL Increment
+    ; If decrement button is pressed then decrement counter, else check 
+    ; next button
+    BTFSC PORTB_temp,6
+    CALL Decrement
+    ; If reset button is pressed then reset the counter, else call main loop again
+    BTFSC PORTB_temp,7
+    CALL ResetCounter
+    ; Restore context after interrupt instructions
+    SWAPF STATUS_SAVE, W
+    MOVWF STATUS
+    SWAPF W_SAVE, F
+    SWAPF W_SAVE, W
+    ; Execute RETFIE to activate GIE again for a new interrupt
+    RETFIE
+    
+    
     ; Initial program setup
 SETUP:
     ; Moving initial value 0 to counter variables
@@ -301,42 +335,6 @@ ResetHundreds:
     MOVLW B'00000000'
     MOVWF hundreds
     RETURN
-    
-    
-INT_SERV:
-    ; Save context before executing the interrupt instructions
-    MOVWF W_SAVE
-    SWAPF STATUS, W
-    MOVWF STATUS_SAVE
-    
-    ; Read PORTB in order to clear the mismatch condition stated in the datasheet
-    banksel PORTB
-    MOVF PORTB, W
-    ; Copy PORTB to PORTB_temp in order to read bits from PORTB value
-    MOVWF PORTB_temp
-    ; Clear RBIF flag
-    banksel INTCON
-    BCF INTCON,RBIF
-     
-    ; If increment button is pressed then increment counter, else check next button
-    BTFSC PORTB_temp,5
-    CALL Increment
-    ; If decrement button is pressed then decrement counter, else check 
-    ; next button
-    BTFSC PORTB_temp,6
-    CALL Decrement
-    ; If reset button is pressed then reset the counter, else call main loop again
-    BTFSC PORTB_temp,7
-    CALL ResetCounter
-    
-    ; Restore context after interrupt instructions
-    SWAPF STATUS_SAVE, W
-    MOVWF STATUS
-    SWAPF W_SAVE, F
-    SWAPF W_SAVE, W
-    
-    ; Execute RETFIE to activate GIE again for a new interrupt
-    RETFIE
     
     
     ; Program end
