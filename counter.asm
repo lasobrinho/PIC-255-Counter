@@ -11,65 +11,34 @@
     
 #include <p16f877a.inc>
     
-    __CONFIG _FOSC_HS & _WDTE_OFF & _PWRTE_ON & _BOREN_ON & _LVP_OFF & _CPD_OFF & _WRT_OFF & _CP_OFF
+    __CONFIG _FOSC_XT & _WDTE_OFF & _PWRTE_OFF & _BOREN_OFF & _LVP_OFF & _CPD_OFF & _WRT_OFF & _CP_OFF
     
     ; Declaring program variables
     cblock 0x20
-    units
+    units 
     tens
     hundreds
-    ; temp variable is used with assembly-style if statements to store the subtraction result
+    ; temp variable is used with assembly-style if statements to store the 
+    ; subtraction result
     temp
-    ; Variable to store current PORTB values in order to properly clear RBIE interrupt
+    ; Variable to store current PORTB values in order to properly 
+    ; clear RBIE interruption
     PORTB_temp
-    ; Variables used in context saving for interrupts
+    ; Variables used in context saving for interruptions
     W_SAVE
     STATUS_SAVE
     ; Auxiliar variable for CheckRange function
     range
-    endc
+    endc 
     
     ; SETUP call
     org 0x00
-    GOTO SETUP
+    CALL SETUP
     
-    ; 0x04 address for interrupt management
+    ; 0x04 address for interruption management
     org 0x04
-    GOTO INT_SERV
-    
-    ; Interrupt function
-INT_SERV:
-    ; Save context before executing the interrupt instructions
-    MOVWF W_SAVE
-    SWAPF STATUS, W
-    MOVWF STATUS_SAVE
-    ; Read PORTB in order to clear the mismatch condition stated in the datasheet
-    banksel PORTB
-    MOVF PORTB, W
-    ; Copy PORTB to PORTB_temp in order to read bits from PORTB value
-    MOVWF PORTB_temp
-    ; Clear RBIF flag
-    banksel INTCON
-    BCF INTCON,RBIF
-     
-    ; If increment button is pressed then increment counter, else check next button
-    BTFSC PORTB_temp,5
-    CALL Increment
-    ; If decrement button is pressed then decrement counter, else check 
-    ; next button
-    BTFSC PORTB_temp,6
-    CALL Decrement
-    ; If reset button is pressed then reset the counter, else call main loop again
-    BTFSC PORTB_temp,7
-    CALL ResetCounter
-    ; Restore context after interrupt instructions
-    SWAPF STATUS_SAVE, W
-    MOVWF STATUS
-    SWAPF W_SAVE, F
-    SWAPF W_SAVE, W
-    ; Execute RETFIE to activate GIE again for a new interrupt
+    CALL INT_SERV
     RETFIE
-    
     
     ; Initial program setup
 SETUP:
@@ -105,7 +74,7 @@ MainLoop:
     CALL DisplayUnits
     CALL DisplayTens
     CALL DisplayHundreds
-    ; Continue looping if no interrupts happen
+    ; Continue looping if no interruptions happen
     GOTO MainLoop
 
     
@@ -117,6 +86,7 @@ DisplayUnits:
     BCF PORTC,6
     BCF PORTC,5
     ; Moving units value to PORTC to be displayed
+    ;banksel PORTC
     MOVF units,W
     MOVWF PORTC 
     ; Setting PORTB bit 7 as high to power on the display
@@ -132,6 +102,7 @@ DisplayTens:
     BCF PORTC,7
     BCF PORTC,5
     ; Moving tens value to PORTC to be displayed
+    ;banksel PORTC
     MOVF tens,W
     MOVWF PORTC
     ; Setting PORTB bit 6 as high to power on the display
@@ -147,6 +118,7 @@ DisplayHundreds:
     BCF PORTC,7
     BCF PORTC,6
     ; Moving hundreds value to PORTC to be displayed
+    ;banksel PORTC
     MOVF hundreds,W
     MOVWF PORTC
     ; Setting PORTB bit 5 as high to power on the display
@@ -175,7 +147,8 @@ Increment:
     
     ; Function to increment tens variable/counter
 IncrementTens:
-    ; If this function was called, it means that units variable needs to be reset to 0, so we call ResetUnits function
+    ; If this function was called, it means that units variable needs to 
+    ; be reset to 0, so we call ResetUnits function
     CALL ResetUnits
     ; Increment tens variable
     INCF tens,F
@@ -193,7 +166,8 @@ IncrementTens:
     
     ; Function to increment hundreds variable/counter
 IncrementHundreds:
-    ; If this function was called, it means that tens variable needs to be reset to 0, so we call ResetTens function
+    ; If this function was called, it means that tens variable needs to 
+    ; be reset to 0, so we call ResetTens function
     CALL ResetTens
     ; Increment hundreds variable
     INCF hundreds,F
@@ -231,7 +205,8 @@ DecrementTens:
     ADDLW B'00000001'
     MOVWF temp
     MOVF temp,F
-    ; If tens = D'255' then decrement hundreds variable. Otherwise go to main loop
+    ; If tens = D'255' then decrement hundreds variable. Otherwise go to 
+    ; main loop
     BTFSC STATUS,Z
     CALL DecrementHundreds
     RETURN
@@ -291,7 +266,8 @@ CheckOverflow:
     RETURN
     
     
-    ; Function to check if user decremented from 000, and increment units if that's the case
+    ; Function to check if user decremented from 000, and increment units 
+    ; if that's the case
 CheckUnderflow:
     ; Checks if hundreds = D'255'
     MOVLW B'00000000'
@@ -334,6 +310,45 @@ ResetHundreds:
     ; Moves D'0' to hundreds variable
     MOVLW B'00000000'
     MOVWF hundreds
+    RETURN
+    
+    
+INT_SERV:
+    ; Save context before executing the interruption instructions
+    MOVWF W_SAVE
+    SWAPF STATUS, W
+    MOVWF STATUS_SAVE
+    
+    ; Read PORTB in order to clear the mismatch condition stated 
+    ; in the datasheet
+    banksel PORTB
+    MOVF PORTB, W
+    ; Copy PORTB to PORTB_temp in order to read bits from PORTB value
+    MOVWF PORTB_temp
+    ; Clear RBIF flag
+    banksel INTCON
+    BCF INTCON,RBIF
+     
+    ; If increment button is pressed then increment counter, else check 
+    ; next button
+    BTFSC PORTB_temp,5
+    CALL Increment
+    ; If decrement button is pressed then decrement counter, else check 
+    ; next button
+    BTFSC PORTB_temp,6
+    CALL Decrement
+    ; If reset button is pressed then reset the counter, else call 
+    ; main loop again
+    BTFSC PORTB_temp,7
+    CALL ResetCounter
+    
+    ; Restore context after interruption instructions
+    SWAPF STATUS_SAVE, W
+    MOVWF STATUS
+    SWAPF W_SAVE, F
+    SWAPF W_SAVE, W
+    
+    ; Execute RETFIE to activate GIE again for a new interruption
     RETURN
     
     
