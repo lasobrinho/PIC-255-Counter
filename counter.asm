@@ -148,8 +148,9 @@ Increment:
     ; Function to increment tens variable/counter
 IncrementTens:
     ; If this function was called, it means that units variable needs to 
-    ; be reset to 0, so we call ResetUnits function
-    CALL ResetUnits
+    ; be reset to 0, so we reset units to 0
+    MOVLW B'00000000'
+    MOVWF units
     ; Increment tens variable
     INCF tens,F
     ; Checks if tens = D'10'
@@ -167,8 +168,9 @@ IncrementTens:
     ; Function to increment hundreds variable/counter
 IncrementHundreds:
     ; If this function was called, it means that tens variable needs to 
-    ; be reset to 0, so we call ResetTens function
-    CALL ResetTens
+    ; be reset to 0, so we call reset tens to 0
+    MOVLW B'00000000'
+    MOVWF tens
     ; Increment hundreds variable
     INCF hundreds,F
     RETURN
@@ -187,8 +189,17 @@ Decrement:
     ; If units = D'255' then decrement tens variable
     BTFSC STATUS,Z
     CALL DecrementTens
-    ; Check if the user isn't trying to decrement from 000
-    CALL CheckUnderflow
+    ; Check underflow: checks if the user isn't trying to decrement from 000
+    ; Checks if hundreds = D'255'
+    MOVLW B'00000000'
+    ADDWF hundreds,W
+    ADDLW -B'11111111'
+    MOVWF temp
+    MOVF temp,F
+    ; If hundreds = D'255' then just call increment to return to 000
+    BTFSC STATUS,Z
+    CALL Increment
+    ; End of underflow checking
     RETURN
     
     
@@ -264,21 +275,7 @@ CheckOverflow:
     BTFSC STATUS,Z
     DECF units,F
     RETURN
-    
-    
-    ; Function to check if user decremented from 000, and increment units 
-    ; if that's the case
-CheckUnderflow:
-    ; Checks if hundreds = D'255'
-    MOVLW B'00000000'
-    ADDWF hundreds,W
-    ADDLW -B'11111111'
-    MOVWF temp
-    MOVF temp,F
-    ; If hundreds = D'255' then just call increment to return to 000
-    BTFSC STATUS,Z
-    CALL Increment
-    RETURN
+
     
     ; Auxiliar function to reset the counter displays and variables
 ResetCounter:
@@ -348,7 +345,6 @@ INT_SERV:
     SWAPF W_SAVE, F
     SWAPF W_SAVE, W
     
-    ; Execute RETFIE to activate GIE again for a new interruption
     RETURN
     
     
